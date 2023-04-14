@@ -30,13 +30,12 @@ int main(int argc, char **argv)
 
     listenfd = Open_listenfd(argv[1]);
     while (1) {
-	clientlen = sizeof(clientaddr);
-	connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
-        Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, 
-                    port, MAXLINE, 0);
+        clientlen = sizeof(clientaddr);
+        connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
+        Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
         printf("Accepted connection from (%s, %s)\n", hostname, port);
-	doit(connfd);                                             //line:netp:tiny:doit
-	Close(connfd);                                            //line:netp:tiny:close
+        doit(connfd);                                             //line:netp:tiny:doit
+        Close(connfd);                                            //line:netp:tiny:close
     }
 }
 /* $end tinymain */
@@ -69,26 +68,24 @@ void doit(int fd)
     /* Parse URI from GET request */
     is_static = parse_uri(uri, filename, cgiargs);       //line:netp:doit:staticcheck
     if (stat(filename, &sbuf) < 0) {                     //line:netp:doit:beginnotfound
-	clienterror(fd, filename, "404", "Not found",
-		    "Tiny couldn't find this file");
-	return;
+	    clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
+	    return;
     }                                                    //line:netp:doit:endnotfound
 
     if (is_static) { /* Serve static content */          
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't read the file");
-	    return;
-	}
-	serve_static(fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
+            clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
+            return;
+        }
+        serve_static(fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
     }
     else { /* Serve dynamic content */
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't run the CGI program");
-	    return;
-	}
-	serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
+            clienterror(fd, filename, "403", "Forbidden",
+                "Tiny couldn't run the CGI program");
+            return;
+        }
+        serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
     }
 }
 /* $end doit */
@@ -118,15 +115,15 @@ void read_requesthdrs(rio_t *rp)
 /* $begin parse_uri */
 int parse_uri(char *uri, char *filename, char *cgiargs) 
 {
-    char *ptr;
+  char *ptr;
 
-    if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
+  if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
 	strcpy(cgiargs, "");                             //line:netp:parseuri:clearcgi
 	strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
 	strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
 	    strcat(filename, "home.html");               //line:netp:parseuri:appenddefault
-	return 1;
+	    return 1;
     }
     else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
 	ptr = index(uri, '?');                           //line:netp:parseuri:beginextract
@@ -165,10 +162,12 @@ void serve_static(int fd, char *filename, int filesize)
 
     /* Send response body to client */
     srcfd = Open(filename, O_RDONLY, 0); //line:netp:servestatic:open
-    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); //line:netp:servestatic:mmap
+    srcp = (char*)Malloc(filesize);
+    Rio_readn(srcfd, srcp, filesize);
+    // Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); //line:netp:servestatic:mmap
     Close(srcfd);                       //line:netp:servestatic:close
     Rio_writen(fd, srcp, filesize);     //line:netp:servestatic:write
-    Munmap(srcp, filesize);             //line:netp:servestatic:munmap
+    Munmap(srcp, filesize);             //line:netp:servestatic:munmap  
 }
 
 /*
@@ -184,6 +183,8 @@ void get_filetype(char *filename, char *filetype)
 	strcpy(filetype, "image/png");
     else if (strstr(filename, ".jpg"))
 	strcpy(filetype, "image/jpeg");
+    else if (strstr(filename, ".mp4"))
+	strcpy(filetype, "video/mp4");
     else
 	strcpy(filetype, "text/plain");
 }  
@@ -204,10 +205,10 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
     Rio_writen(fd, buf, strlen(buf));
   
     if (Fork() == 0) { /* Child */ //line:netp:servedynamic:fork
-	/* Real server would set all CGI vars here */
-	setenv("QUERY_STRING", cgiargs, 1); //line:netp:servedynamic:setenv
-	Dup2(fd, STDOUT_FILENO);         /* Redirect stdout to client */ //line:netp:servedynamic:dup2
-	Execve(filename, emptylist, environ); /* Run CGI program */ //line:netp:servedynamic:execve
+      /* Real server would set all CGI vars here */
+      setenv("QUERY_STRING", cgiargs, 1); //line:netp:servedynamic:setenv
+      Dup2(fd, STDOUT_FILENO);         /* Redirect stdout to client */ //line:netp:servedynamic:dup2
+      Execve(filename, emptylist, environ); /* Run CGI program */ //line:netp:servedynamic:execve
     }
     Wait(NULL); /* Parent waits for and reaps child */ //line:netp:servedynamic:wait
 }
