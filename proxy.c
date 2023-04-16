@@ -3,7 +3,6 @@
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
-
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
@@ -19,33 +18,41 @@ static const char *user_agent_hdr =
 int main(int argc, char **argv) {
   printf("%s", user_agent_hdr);
 
-  int listenfd, connfd, clientfd;
-  char hostname[MAXLINE], port[MAXLINE], buf[MAXLINE];  
-  socklen_t clientlen;
+  int listenfd, connfd, clientfd, serverfd, proxy_to_server_fd;
+  char hostname[MAXLINE], port[MAXLINE], buf[MAXLINE];
+  struct stat sbuf;
+  socklen_t clientlen, serverlen;
   rio_t rio;
-  struct sockaddr_storage clientaddr;
+  struct sockaddr_storage clientaddr, serveraddr;
 
     /* Check command line args */
-  if (argc != 2) {
-	  fprintf(stderr, "usage: %s <port>\n", argv[0]);
+  if (argc != 3) {
+	  fprintf(stderr, "usage: %s <port> <server port>\n", argv[0]);
 	  exit(1);
   }
   listenfd = Open_listenfd(argv[1]);
   while (1) {
     clientlen = sizeof(clientaddr);
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
-    Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-    printf("Accepted connection from (%s, %s)\n", hostname, port);
-    connect(connfd, ) 
-    Rio_writen(clientfd, , );
-    Rio_readlineb(&rio, buf, MAXLINE);
-    srcfd = Open(filename, O_RDONLY, 0); //line:netp:servestatic:open
-    srcp = (char*)Malloc(filesize);
-    Rio_readn(srcfd, srcp, filesize);
-    // Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); //line:netp:servestatic:mmap
-    Close(srcfd);                       //line:netp:servestatic:close
-    Rio_writen(fd, srcp, filesize);     //line:netp:servestatic:write
-    free(srcp);   
+    if (connfd != -1){
+      Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+      printf("Accepted connection from (%s, %s)\n", hostname, port);
+      break;
+    }
   }
+  proxy_to_server_fd = Open_clientfd(hostname, argv[2]);
+  stat(connfd, &sbuf);
+
+  Rio_readn(connfd, buf, sbuf.st_size);
+  while(1){
+    Rio_writen(proxy_to_server_fd, buf, sbuf.st_size);
+    Rio_readn(proxy_to_server_fd, buf, sbuf.st_size);
+    Rio_writen(connfd, buf, sbuf.st_size);
+  }
+  close(proxy_to_server_fd);
+  close(connfd);
+  close(listenfd);
+
   return 0;
+
 }
