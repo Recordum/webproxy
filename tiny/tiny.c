@@ -114,7 +114,7 @@ void read_requesthdrs(rio_t *rp)
  *             return 0 if dynamic content, 1 if static
  */
 /* $begin parse_uri */
-int parse_uri(char *uri, char *filename, char *cgiargs) 
+int parse_uri(char *uri, char *filename, char *cgiargs ) 
 {
   char *ptr;
 
