@@ -34,7 +34,7 @@ int main(int argc, char **argv)
         connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
         Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
         printf("Accepted connection from (%s, %s)\n", hostname, port);
-        doit(connfd);                                             //line:netp:tiny:doit
+        doit(connfd);                                           //line:netp:tiny:doit
         Close(connfd);                                            //line:netp:tiny:close
     }
 }
@@ -51,11 +51,12 @@ void doit(int fd)
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
     char filename[MAXLINE], cgiargs[MAXLINE];
     rio_t rio;
-
     /* Read request line and headers */
     Rio_readinitb(&rio, fd);
-    if (!Rio_readlineb(&rio, buf, MAXLINE))  //line:netp:doit:readrequest
+    if (!Rio_readlineb(&rio, buf, MAXLINE)){  //line:netp:doit:readrequest
+        printf("return\n");
         return;
+    }
     printf("%s", buf);
     sscanf(buf, "%s %s %s", method, uri, version);       //line:netp:doit:parserequest
     if (strcasecmp(method, "GET") != 0 && strcasecmp(method, "HEAD") != 0) {                     //line:netp:doit:beginrequesterr
@@ -74,6 +75,7 @@ void doit(int fd)
     }                                                    //line:netp:doit:endnotfound
 
     if (is_static) { /* Serve static content */          
+        printf("start static\n");
         if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
             clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
             return;
@@ -102,8 +104,8 @@ void read_requesthdrs(rio_t *rp)
     Rio_readlineb(rp, buf, MAXLINE);
     printf("%s", buf);
     while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
-	Rio_readlineb(rp, buf, MAXLINE);
-	printf("%s", buf);
+        Rio_readlineb(rp, buf, MAXLINE);
+        printf("%s", buf);
     }
     return;
 }
@@ -124,6 +126,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs )
 	strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
 	    strcat(filename, "home.html");               //line:netp:parseuri:appenddefault
+        printf("filename : %s\n", filename);
 	    return 1;
     }
     else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
@@ -149,7 +152,9 @@ void serve_static(int fd, char *filename, int filesize, char* method)
 {
     int srcfd;
     char *srcp, filetype[MAXLINE], buf[MAXBUF];
-
+    printf("start-serve-static\n");
+    printf("method : %s\n", method);
+    printf("filename : %s\n", filename);
     /* Send response headers to client */
     get_filetype(filename, filetype);    //line:netp:servestatic:getfiletype
     sprintf(buf, "HTTP/1.0 200 OK\r\n"); //line:netp:servestatic:beginserve
@@ -169,8 +174,11 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     Rio_readn(srcfd, srcp, filesize);
     // Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); //line:netp:servestatic:mmap
     Close(srcfd);                       //line:netp:servestatic:close
-    Rio_writen(fd, srcp, filesize);     //line:netp:servestatic:write
-    free(srcp);   
+    Rio_writen(fd, srcp, filesize);
+        //line:netp:servestatic:write
+    free(srcp); 
+    printf("end-serve-static\n");  
+    
               //line:netp:servestatic:munmap      
 }
 
