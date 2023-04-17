@@ -31,6 +31,7 @@ int main(int argc, char **argv) {
       Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
       printf("Accepted connection from (%s, %s)\n", hostname, port);
       doit(connfd);
+      close(connfd);
     }
   }
 }
@@ -43,21 +44,20 @@ void doit(int fd){
   struct sockaddr_storage clientaddr, serveraddr;
   Rio_readinitb(&rio, fd);
   index = 0;
-  while(strcmp(buf,"\r\n")){
-    if (index == 0){
-      Rio_readlineb(&rio, buf, MAXLINE);
-      sscanf(buf, "%s %s %s", method, uri, version);
-      parse_uri(uri, port, path, hostname);
-      strcat(method, " ");
-      strcat(method, path);
-      strcat(method, " ");
-      strcat(method, version);
-      strcpy(buf, method);
-      strcat(totalbuf, buf);
-      printf("parse uri  : %s\n", totalbuf);
-      index ++;
-      continue;
-    }
+  strcpy(totalbuf, "");
+  
+  Rio_readlineb(&rio, buf, MAXLINE);
+  sscanf(buf, "%s %s %s", method, uri, version);
+  parse_uri(uri, port, path, hostname);
+  strcat(method, " ");
+  strcat(method, path);
+  strcat(method, " ");
+  strcat(method, version);
+  strcpy(buf, method);
+  strcat(totalbuf, buf);
+  printf("parse uri  : %s\n", totalbuf);   
+  printf("uri %s\n", uri); 
+  while(strcmp(buf,"\r\n")){  
     Rio_readlineb(&rio, buf, MAXLINE);
     strcat(totalbuf, buf);
     printf("buf : %s", buf);
@@ -65,17 +65,15 @@ void doit(int fd){
   
   proxy_to_server_fd = Open_clientfd(hostname, port);
 
-  Rio_writen(proxy_to_server_fd, totalbuf, strlen(totalbuf)); // 수정된 부분
+  Rio_writen(proxy_to_server_fd, totalbuf, strlen(totalbuf));
 
   Rio_readinitb(&rio2, proxy_to_server_fd);
 
  
-  while((n = Rio_readlineb(&rio2, newbuf, MAXLINE)) > 0){ // 수정된 부분
-    Rio_writen(fd, newbuf, n); // 수정된 부분
+  while((n = Rio_readlineb(&rio2, newbuf, MAXLINE)) > 0){
+    Rio_writen(fd, newbuf, n);
   }                     
   close(proxy_to_server_fd);  
-
-
 
   return 0;
 
@@ -91,6 +89,7 @@ int parse_uri(char *uri, char *port, char *path, char *hostname ) {
 
   strncpy(hostname, host_index, strlen(host_index) - strlen(port_index) -1);
   strncpy(port, port_index, strlen(port_index) - strlen(path_index)); 
+  path[0] = '\0';
   if (path_index[strlen(path_index)-1] == '/'){
     strcat(path, "/");
     printf("path : %s\n", path);
