@@ -5,6 +5,8 @@
 #define MAX_OBJECT_SIZE 102400
 
 void doit(int fd);
+void *thread(void *vargp);
+int parse_uri(char *uri, char *port, char *path, char *hostname );
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
@@ -13,10 +15,11 @@ static const char *user_agent_hdr =
 int main(int argc, char **argv) {
   printf("%s", user_agent_hdr);
 
-  int listenfd, connfd;
+  int listenfd, *connfd;
   char hostname[MAXLINE], port[MAXLINE];
-  socklen_t clientlen, serverlen;
-  struct sockaddr_storage clientaddr, serveraddr;
+  socklen_t clientlen;
+  struct sockaddr_storage clientaddr;
+  pthread_t tid;
   
     /* Check command line args */
   if (argc != 2) {
@@ -26,14 +29,21 @@ int main(int argc, char **argv) {
   listenfd = Open_listenfd(argv[1]);
   while (1) {
     clientlen = sizeof(clientaddr);
-    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
-    if (connfd != -1){
-      Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-      printf("Accepted connection from (%s, %s)\n", hostname, port);
-      doit(connfd);
-      close(connfd);
-    }
+    connfd = Malloc(sizeof(int)); //line:conc:echoservert:beginmalloc
+	  *connfd = Accept(listenfd, (SA *) &clientaddr, &clientlen); //line:conc:echoservert:endmalloc
+    Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+    printf("Accepted connection from (%s, %s)\n", hostname, port);
+	  Pthread_create(&tid, NULL, thread, connfd);
   }
+}
+void *thread(void *vargp) 
+{  
+    int connfd = *((int *)vargp);
+    Pthread_detach(pthread_self()); //line:conc:echoservert:detach
+    Free(vargp);                    //line:conc:echoservert:free
+    doit(connfd);
+    Close(connfd);
+    return NULL;
 }
 
 void doit(int fd){  
